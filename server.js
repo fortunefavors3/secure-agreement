@@ -1,78 +1,93 @@
-require("dotenv").config();
-const express = require("express");
-const PDFDocument = require("pdfkit");
-const nodemailer = require("nodemailer");
-const crypto = require("crypto");
-const fs = require("fs");
-const path = require("path");
+const express = require('express');
+const bodyParser = require('body-parser');
+const PDFDocument = require('pdfkit');
+const nodemailer = require('nodemailer');
+const fs = require('fs');
+const path = require('path');
+
+require('dotenv').config();
 
 const app = express();
-app.use(express.json({ limit: "10mb" }));
+const PORT = process.env.PORT || 3000;
+
+app.use(bodyParser.json({ limit: '5mb' }));
 app.use(express.static("public"));
+app.use('/agreements', express.static(path.join(__dirname, 'agreements')));
 
-app.post("/sign", async (req, res) => {
+// Make agreements folder if it doesn't exist
+if(!fs.existsSync('./agreements')) fs.mkdirSync('./agreements');
+
+app.post("/create-agreement", async (req, res) => {
   try {
-    const { name, email, signature } = req.body;
-    const timestamp = new Date().toISOString();
-    const userAgent = req.headers["user-agent"];
-    const ip = req.ip;
+    const { name, email, signature, timestamp, userAgent } = req.body;
 
-    const hash = crypto
-      .createHash("sha256")
-      .update(name + email + timestamp + ip)
-      .digest("hex");
+    // --- PDF Generation ---
+    const pdfName = `${name.replace(/\s+/g,'_')}_${Date.now()}.pdf`;
+    const pdfPath = path.join(__dirname, 'agreements', pdfName);
 
-    const pdfPath = path.join("agreements", `agreement_${hash}.pdf`);
-
-    const doc = new PDFDocument();
+    const doc = new PDFDocument({ size: 'LETTER', margin: 50 });
     const stream = fs.createWriteStream(pdfPath);
     doc.pipe(stream);
 
-    doc.fontSize(18).text("Surplus Funds Recovery Agreement", { align: "center" });
-    doc.moveDown();
-    doc.text(`Name: ${name}`);
-    doc.text(`Email: ${email}`);
-    doc.text(`IP: ${ip}`);
-    doc.text(`Timestamp: ${timestamp}`);
-    doc.text(`Hash: ${hash}`);
-    doc.moveDown();
-    doc.text("Signature:");
+    // Header
+    doc.fontSize(20).text("Cheqmart Surplus Funds Recovery Agreement", { align: 'center' });
+    doc.moveDown(2);
 
-    if (signature) {
-      const img = Buffer.from(signature.split(",")[1], "base64");
-      doc.image(img, { width: 200 });
+    // Client info
+    doc.fontSize(12).text(`Client Name: ${name}`);
+    doc.text(`Email: ${email}`);
+    doc.text(`Timestamp: ${timestamp}`);
+    doc.text(`User Agent: ${userAgent}`);
+    doc.moveDown();
+
+    // Agreement Text
+    doc.fontSize(11).text("Terms and Agreement:", { underline: true });
+    doc.moveDown(0.5);
+    doc.text("1. Fee: 30% of recovered surplus funds.");
+    doc.text("2. Payment: Direct payment from County; no upfront fees.");
+    doc.text("3. Ownership: Client retains full ownership at all times.");
+    doc.text("4. Consent: By signing below, client agrees to all terms stated herein.");
+    doc.moveDown(2);
+
+    // Signature
+    if(signature){
+      const base64Data = signature.replace(/^data:image\/png;base64,/, '');
+      const imgBuffer = Buffer.from(base64Data, 'base64');
+      doc.text("Electronic Signature:");
+      doc.image(imgBuffer, { width: 200 });
     }
 
     doc.end();
 
-    stream.on("finish", async () => {
-      const transporter = nodemailer.createTransport({
-        service: "gmail",
-        auth: {
-          user: process.env.EMAIL_USER,
-          pass: process.env.EMAIL_PASS
-        }
-      });
+    // Wait for PDF to finish writing
+    await new Promise(resolve => stream.on('finish', resolve));
 
-      await transporter.sendMail({
-        from: "Agreements <agreements@example.com>",
-        to: email,
-        subject: "Your Signed Agreement",
-        text: "Attached is your signed agreement.",
-        attachments: [{ filename: "Agreement.pdf", path: pdfPath }]
-      });
-
-      res.json({ success: true, hash });
+    // --- Email PDF ---
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST, // e.g., smtp.yourdomain.com
+      port: process.env.SMTP_PORT || 587,
+      secure: false,
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS
+      }
     });
 
-  } catch (err) {
+    await transporter.sendMail({
+      from: `"Cheqmart Agreements" <${process.env.SMTP_USER}>`,
+      to: email,
+      bcc: process.env.BCC_EMAIL || '',
+      subject: 'Your Signed Cheqmart Agreement',
+      text: 'Attached is a copy of your signed agreement for your records.',
+      attachments: [{ filename: pdfName, path: pdfPath }]
+    });
+
+    res.json({ success: true, pdf: `/agreements/${pdfName}` });
+
+  } catch(err) {
     console.error(err);
-    res.status(500).json({ error: "Something broke" });
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
-app.listen(3000, () => {
-  console.log("Server running at http://localhost:3000");
-});
-
-
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
