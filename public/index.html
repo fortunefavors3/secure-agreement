@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Sign Agreement</title>
+  <style>
+    canvas { border: 2px solid black; }
+  </style>
+</head>
+<body>
+
+<h2>Sign Below</h2>
+
+<input id="name" placeholder="Full Name"><br><br>
+<input id="email" placeholder="Email"><br><br>
+
+<canvas id="sig" width="400" height="150"></canvas><br>
+<button onclick="clearSig()">Clear</button><br><br>
+
+<button onclick="submitForm()">Submit</button>
+
+<script>
+const canvas = document.getElementById("sig");
+const ctx = canvas.getContext("2d");
+let drawing = false;
+
+canvas.onmousedown = () => drawing = true;
+canvas.onmouseup = () => drawing = false;
+canvas.onmousemove = e => {
+  if (!drawing) return;
+  ctx.lineTo(e.offsetX, e.offsetY);
+  ctx.stroke();
+};
+
+function clearSig() {
+  ctx.clearRect(0,0,400,150);
+}
+
+async function submitForm() {
+  const body = {
+    name: document.getElementById("name").value,
+    email: document.getElementById("email").value,
+    signature: canvas.toDataURL()
+  };
+
+  await fetch("/sign", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+
+  alert("Submitted!");
+}
+</script>
+
+</body>
+</html>
