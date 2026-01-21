@@ -1,56 +1,152 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Sign Agreement</title>
+  <meta charset="UTF-8" />
+  <title>Secure Agreement Signature</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
   <style>
-    canvas { border: 2px solid black; }
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6f8;
+      padding: 40px;
+    }
+
+    .container {
+      max-width: 500px;
+      margin: auto;
+      background: #fff;
+      padding: 25px;
+      border-radius: 8px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    label {
+      font-weight: bold;
+      display: block;
+      margin-top: 15px;
+    }
+
+    input {
+      width: 100%;
+      padding: 10px;
+      margin-top: 5px;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+    }
+
+    canvas {
+      border: 2px solid #000;
+      margin-top: 10px;
+      display: block;
+    }
+
+    .buttons {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 20px;
+    }
+
+    button {
+      padding: 10px 15px;
+      font-size: 16px;
+      cursor: pointer;
+      border-radius: 5px;
+      border: none;
+    }
+
+    .submit {
+      background: #2563eb;
+      color: white;
+    }
+
+    .clear {
+      background: #e5e7eb;
+    }
   </style>
 </head>
+
 <body>
+  <div class="container">
+    <h1>Agreement Signature</h1>
 
-<h2>Sign Below</h2>
+    <form id="agreementForm">
+      <label for="name">Full Name</label>
+      <input type="text" id="name" required />
 
-<input id="name" placeholder="Full Name"><br><br>
-<input id="email" placeholder="Email"><br><br>
+      <label for="email">Email Address</label>
+      <input type="email" id="email" required />
 
-<canvas id="sig" width="400" height="150"></canvas><br>
-<button onclick="clearSig()">Clear</button><br><br>
+      <label>Draw Your Signature</label>
+      <canvas id="signature"></canvas>
 
-<button onclick="submitForm()">Submit</button>
+      <div class="buttons">
+        <button type="button" id="clear" class="clear">Clear</button>
+        <button type="submit" class="submit">Submit</button>
+      </div>
+    </form>
+  </div>
 
-<script>
-const canvas = document.getElementById("sig");
-const ctx = canvas.getContext("2d");
-let drawing = false;
+  <script>
+    const canvas = document.getElementById("signature");
+    const ctx = canvas.getContext("2d");
+    let drawing = false;
 
-canvas.onmousedown = () => drawing = true;
-canvas.onmouseup = () => drawing = false;
-canvas.onmousemove = e => {
-  if (!drawing) return;
-  ctx.lineTo(e.offsetX, e.offsetY);
-  ctx.stroke();
-};
+    canvas.width = 400;
+    canvas.height = 150;
 
-function clearSig() {
-  ctx.clearRect(0,0,400,150);
-}
+    canvas.addEventListener("mousedown", () => drawing = true);
+    canvas.addEventListener("mouseup", () => {
+      drawing = false;
+      ctx.beginPath();
+    });
+    canvas.addEventListener("mousemove", draw);
 
-async function submitForm() {
-  const body = {
-    name: document.getElementById("name").value,
-    email: document.getElementById("email").value,
-    signature: canvas.toDataURL()
-  };
+    function draw(e) {
+      if (!drawing) return;
+      ctx.lineWidth = 2;
+      ctx.lineCap = "round";
+      ctx.strokeStyle = "#000";
+      ctx.lineTo(e.offsetX, e.offsetY);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(e.offsetX, e.offsetY);
+    }
 
-  await fetch("/sign", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body)
-  });
+    document.getElementById("clear").onclick = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    };
 
-  alert("Submitted!");
-}
-</script>
+    document.getElementById("agreementForm").onsubmit = async (e) => {
+      e.preventDefault();
 
+      const payload = {
+        name: document.getElementById("name").value,
+        email: document.getElementById("email").value,
+        signature: canvas.toDataURL(),
+        timestamp: new Date().toISOString(),
+        userAgent: navigator.userAgent
+      };
+
+      const res = await fetch("/create-agreement", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        alert("Agreement submitted successfully!");
+      } else {
+        alert("Submission failed.");
+      }
+    };
+  </script>
 </body>
 </html>
