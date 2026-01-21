@@ -3,78 +3,85 @@ import cors from "cors";
 import bodyParser from "body-parser";
 import PDFDocument from "pdfkit";
 import nodemailer from "nodemailer";
-import fs from "fs";
 import dotenv from "dotenv";
+import fs from "fs";
 import path from "path";
+import { fileURLToPath } from "url";
 
 dotenv.config();
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const app = express();
-const port = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3000;
 
-// Middleware
 app.use(cors());
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.json({ limit: "5mb" }));
+app.use(express.static(path.join(__dirname, "public")));
 
-// Root endpoint
 app.get("/", (req, res) => {
-  res.send("Secure Agreement Service Running");
+  res.sendFile(path.join(__dirname, "public", "agreement.html"));
 });
 
-// Generate PDF endpoint
 app.post("/generate-pdf", async (req, res) => {
-  try {
-    const { name, agreementText } = req.body;
+  const { name, signature, agreementText } = req.body;
 
-    if (!name || !agreementText) {
-      return res.status(400).json({ error: "Missing required fields" });
-    }
+  if (!name || !signature) {
+    return res.status(400).json({ error: "Missing required fields" });
+  }
 
-    const pdfPath = path.join(process.cwd(), `${name}-agreement.pdf`);
-    const doc = new PDFDocument();
-    doc.pipe(fs.createWriteStream(pdfPath));
-    doc.fontSize(20).text(`Agreement for ${name}`, { align: "center" });
-    doc.moveDown();
-    doc.fontSize(12).text(agreementText);
-    doc.end();
+  const doc = new PDFDocument();
+  const filePath = `/tmp/agreement-${Date.now()}.pdf`;
+  const stream = fs.createWriteStream(filePath);
 
-    // Wait until PDF is written
-    doc.on("finish", async () => {
-      // Send email
-      const transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: parseInt(process.env.SMTP_PORT),
-        secure: false, // true for 465, false for other ports
-        auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS
-        }
-      });
+  doc.pipe(stream);
 
-      await transporter.sendMail({
-        from: process.env.EMAIL_FROM,
-        to: process.env.EMAIL_TO,
-        subject: `Agreement for ${name}`,
-        text: `Please find attached the agreement for ${name}.`,
-        attachments: [
-          {
-            filename: `${name}-agreement.pdf`,
-            path: pdfPath
-          }
-        ]
-      });
+  doc.fontSize(16).text("Surplus Funds Recovery Agreement", { align: "center" });
+  doc.moveDown();
 
-      res.json({ message: "PDF generated and emailed successfully" });
+  doc.fontSize(12).text(`Client Name: ${name}`);
+  doc.moveDown();
+  doc.text(agreementText || "Client agrees to a 30% recovery fee paid directly by the county.");
+  doc.moveDown();
+
+  doc.text("Signature:");
+  doc.image(signature, { width: 200 });
+  doc.moveDown();
+
+  doc.text(`Signed on: ${new Date().toLocaleString()}`);
+  doc.text(`IP Address: ${req.ip}`);
+
+  doc.end();
+
+  stream.on("finish", async () => {
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: process.env.SMTP_PORT,
+      secure: false,
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS
+      }
     });
 
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Failed to generate PDF or send email" });
-  }
+    await transporter.sendMail({
+      from: process.env.EMAIL_FROM,
+      to: process.env.EMAIL_TO,
+      subject: "New Signed Agreement",
+      text: "Attached is a signed surplus funds recovery agreement.",
+      attachments: [
+        {
+          filename: "agreement.pdf",
+          path: filePath
+        }
+      ]
+    });
+
+    res.json({ success: true });
+  });
 });
 
-// Start server
-app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });
