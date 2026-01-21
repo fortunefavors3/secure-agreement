@@ -1,12 +1,10 @@
-import express from 'express';
-import bodyParser from 'body-parser';
-import PDFDocument from 'pdfkit';
-import fs from 'fs';
-import nodemailer from 'nodemailer';
-import dotenv from 'dotenv';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
+const express = require('express');
+const bodyParser = require('body-parser');
+const PDFDocument = require('pdfkit');
+const fs = require('fs');
+const nodemailer = require('nodemailer');
+const dotenv = require('dotenv');
+const path = require('path');
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
@@ -84,3 +82,4 @@ app.post('/create-agreement', async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
