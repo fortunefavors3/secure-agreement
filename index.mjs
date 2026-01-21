@@ -13,12 +13,12 @@ const PORT = process.env.PORT || 3000;
 
 // Nodemailer transporter — replace with your email service and credentials
 const transporter = nodemailer.createTransport({
-  host: "smtp.example.com", // e.g., smtp.gmail.com
-  port: 587,
-  secure: false, // true for 465
+  host: "mail.privateemail.com", // e.g., smtp.gmail.com
+  port: 465,
+  secure: true, // true for 465
   auth: {
-    user: "your-email@example.com",
-    pass: "your-email-password"
+    user: "agreements@cheqmart.com",
+    pass: "Nikekick2"
   }
 });
 
@@ -79,3 +79,4 @@ app.get("/", (req, res) => {
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+
