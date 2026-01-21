@@ -1,61 +1,212 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Surplus Funds Agreement</title>
+  <meta charset="UTF-8" />
+  <title>Secure Agreement – Surplus Funds Recovery</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
   <style>
-    body { font-family: Arial; max-width: 700px; margin: auto; }
-    canvas { border: 1px solid #000; }
-    button { padding: 10px; margin-top: 10px; }
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      background: #f4f6f8;
+      margin: 0;
+      padding: 0;
+      color: #222;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 40px auto;
+      background: #ffffff;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 10px;
+    }
+
+    h2 {
+      margin-top: 30px;
+      font-size: 18px;
+    }
+
+    p {
+      line-height: 1.6;
+      font-size: 15px;
+    }
+
+    .highlight {
+      background: #f9fafb;
+      padding: 15px;
+      border-left: 4px solid #2563eb;
+      margin: 20px 0;
+    }
+
+    label {
+      display: block;
+      margin-top: 15px;
+      font-weight: bold;
+    }
+
+    input[type="text"],
+    input[type="email"] {
+      width: 100%;
+      padding: 10px;
+      font-size: 15px;
+      margin-top: 5px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+    }
+
+    canvas {
+      border: 2px dashed #999;
+      margin-top: 10px;
+      width: 100%;
+      height: 150px;
+      cursor: crosshair;
+    }
+
+    .checkbox {
+      margin-top: 20px;
+    }
+
+    button {
+      margin-top: 25px;
+      background: #2563eb;
+      color: white;
+      border: none;
+      padding: 14px 20px;
+      font-size: 16px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #1d4ed8;
+    }
+
+    .footer {
+      text-align: center;
+      font-size: 13px;
+      margin-top: 30px;
+      color: #666;
+    }
   </style>
 </head>
 <body>
 
-<h2>Surplus Funds Recovery Agreement</h2>
+<div class="container">
+  <h1>Surplus Funds Recovery Service Agreement</h1>
+  <p style="text-align:center;">
+    Please review this agreement carefully before signing.
+  </p>
 
-<p>
-By signing below, you authorize recovery of surplus funds with a
-<strong>30% contingency fee</strong> paid directly by the county.
-</p>
+  <h2>1. Parties</h2>
+  <p>
+    This Agreement is entered into between <strong>CheqMart Recovery Services</strong>
+    (“Service Provider”) and the undersigned individual (“Client”).
+  </p>
 
-<label>Full Name</label><br>
-<input id="name" style="width:100%; padding:8px"><br><br>
+  <h2>2. Services Provided</h2>
+  <p>
+    The Service Provider agrees to research, prepare, and submit claims to recover
+    surplus or excess funds held by a county or governmental authority on behalf of
+    the Client.
+  </p>
 
-<label>Signature</label><br>
-<canvas id="sig" width="500" height="150"></canvas><br>
-<button onclick="clearSig()">Clear</button><br><br>
+  <h2>3. Fee & Compensation</h2>
+  <div class="highlight">
+    <p>
+      Client agrees to pay the Service Provider a contingency fee of
+      <strong>30% of all recovered surplus funds</strong>.
+    </p>
+    <p>
+      <strong>Direct Payment Stipulation:</strong><br />
+      Client authorizes the county or holding authority to issue payment
+      <strong>directly to the Service Provider</strong>, who will then remit the
+      Client’s remaining balance after deducting the agreed fee.
+    </p>
+  </div>
 
-<button onclick="submitAgreement()">Sign Agreement</button>
+  <h2>4. No Recovery, No Fee</h2>
+  <p>
+    If no surplus funds are successfully recovered, the Client owes nothing.
+  </p>
+
+  <h2>5. Authorization</h2>
+  <p>
+    Client authorizes the Service Provider to act as their representative
+    for purposes of surplus funds recovery, including submitting documentation
+    and communicating with relevant authorities.
+  </p>
+
+  <h2>6. Electronic Signature & Consent</h2>
+  <p>
+    Client agrees that this agreement may be executed electronically.
+    The electronic signature below shall be considered legally binding.
+  </p>
+
+  <form method="POST" action="/submit">
+    <label>Full Legal Name</label>
+    <input type="text" name="name" required />
+
+    <label>Email Address</label>
+    <input type="email" name="email" required />
+
+    <label>Draw Your Signature Below</label>
+    <canvas id="signature-pad"></canvas>
+    <input type="hidden" name="signature" id="signature-data" />
+
+    <div class="checkbox">
+      <input type="checkbox" id="consent" required />
+      <label for="consent">
+        I have read, understand, and agree to this Service Agreement.
+      </label>
+    </div>
+
+    <button type="submit">Sign & Submit Agreement</button>
+  </form>
+
+  <div class="footer">
+    © 2026 CheqMart Recovery Services – Secure Digital Agreement
+  </div>
+</div>
 
 <script>
-const canvas = document.getElementById("sig");
-const ctx = canvas.getContext("2d");
-let drawing = false;
+  const canvas = document.getElementById("signature-pad");
+  const ctx = canvas.getContext("2d");
 
-canvas.onmousedown = () => drawing = true;
-canvas.onmouseup = () => drawing = false;
-canvas.onmousemove = e => {
-  if (!drawing) return;
-  ctx.lineTo(e.offsetX, e.offsetY);
-  ctx.stroke();
-};
+  let drawing = false;
 
-function clearSig() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-}
+  function resizeCanvas() {
+    canvas.width = canvas.offsetWidth;
+    canvas.height = canvas.offsetHeight;
+  }
 
-async function submitAgreement() {
-  const name = document.getElementById("name").value;
-  const signature = canvas.toDataURL();
+  resizeCanvas();
+  window.addEventListener("resize", resizeCanvas);
 
-  const res = await fetch("/generate-pdf", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name, signature })
+  canvas.addEventListener("mousedown", () => drawing = true);
+  canvas.addEventListener("mouseup", () => drawing = false);
+  canvas.addEventListener("mouseleave", () => drawing = false);
+
+  canvas.addEventListener("mousemove", (e) => {
+    if (!drawing) return;
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+    ctx.strokeStyle = "#000";
+    ctx.lineTo(e.offsetX, e.offsetY);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(e.offsetX, e.offsetY);
   });
 
-  if (res.ok) alert("Agreement submitted successfully!");
-  else alert("Error submitting agreement");
-}
+  document.querySelector("form").addEventListener("submit", () => {
+    document.getElementById("signature-data").value = canvas.toDataURL();
+  });
 </script>
 
 </body>
