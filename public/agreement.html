@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Surplus Funds Agreement</title>
+  <style>
+    body { font-family: Arial; max-width: 700px; margin: auto; }
+    canvas { border: 1px solid #000; }
+    button { padding: 10px; margin-top: 10px; }
+  </style>
+</head>
+<body>
+
+<h2>Surplus Funds Recovery Agreement</h2>
+
+<p>
+By signing below, you authorize recovery of surplus funds with a
+<strong>30% contingency fee</strong> paid directly by the county.
+</p>
+
+<label>Full Name</label><br>
+<input id="name" style="width:100%; padding:8px"><br><br>
+
+<label>Signature</label><br>
+<canvas id="sig" width="500" height="150"></canvas><br>
+<button onclick="clearSig()">Clear</button><br><br>
+
+<button onclick="submitAgreement()">Sign Agreement</button>
+
+<script>
+const canvas = document.getElementById("sig");
+const ctx = canvas.getContext("2d");
+let drawing = false;
+
+canvas.onmousedown = () => drawing = true;
+canvas.onmouseup = () => drawing = false;
+canvas.onmousemove = e => {
+  if (!drawing) return;
+  ctx.lineTo(e.offsetX, e.offsetY);
+  ctx.stroke();
+};
+
+function clearSig() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+}
+
+async function submitAgreement() {
+  const name = document.getElementById("name").value;
+  const signature = canvas.toDataURL();
+
+  const res = await fetch("/generate-pdf", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, signature })
+  });
+
+  if (res.ok) alert("Agreement submitted successfully!");
+  else alert("Error submitting agreement");
+}
+</script>
+
+</body>
+</html>
