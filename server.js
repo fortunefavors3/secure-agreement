@@ -6,6 +6,8 @@ const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 
+app.use(express.static("public"));
+
 const app = express();
 app.use(express.json({ limit: "10mb" }));
 
@@ -73,3 +75,4 @@ app.post("/sign", async (req, res) => {
 app.listen(3000, () => {
   console.log("Server running at http://localhost:3000");
 });
+
