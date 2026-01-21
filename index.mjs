@@ -1,80 +1,113 @@
 import express from "express";
-import cors from "cors";
-import bodyParser from "body-parser";
 import PDFDocument from "pdfkit";
 import nodemailer from "nodemailer";
 import fs from "fs";
-import dotenv from "dotenv";
 import path from "path";
 
-dotenv.config();
-
 const app = express();
-const port = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3000;
 
-// Middleware
-app.use(cors());
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "10mb" }));
 
-// Root endpoint
+/* =========================
+   MAIN AGREEMENT PAGE
+========================= */
 app.get("/", (req, res) => {
-  res.send("Secure Agreement Service Running");
+  res.sendFile(path.join(process.cwd(), "public", "agreement.html"));
 });
 
-// Generate PDF endpoint
-app.post("/generate-pdf", async (req, res) => {
+/* =========================
+   FORM SUBMISSION
+========================= */
+app.post("/submit", async (req, res) => {
   try {
-    const { name, agreementText } = req.body;
+    const { name, email, signatureData } = req.body;
 
-    if (!name || !agreementText) {
-      return res.status(400).json({ error: "Missing required fields" });
+    if (!name || !email || !signatureData) {
+      return res.status(400).send("Missing required fields");
     }
 
-    const pdfPath = path.join(process.cwd(), `${name}-agreement.pdf`);
-    const doc = new PDFDocument();
-    doc.pipe(fs.createWriteStream(pdfPath));
-    doc.fontSize(20).text(`Agreement for ${name}`, { align: "center" });
+    /* ===== CREATE PDF ===== */
+    const pdfPath = `/tmp/agreement-${Date.now()}.pdf`;
+    const doc = new PDFDocument({ margin: 50 });
+
+    const writeStream = fs.createWriteStream(pdfPath);
+    doc.pipe(writeStream);
+
+    doc.fontSize(18).text("Surplus Funds Recovery Agreement", { align: "center" });
     doc.moveDown();
-    doc.fontSize(12).text(agreementText);
-    doc.end();
 
-    // Wait until PDF is written
-    doc.on("finish", async () => {
-      // Send email
-      const transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: parseInt(process.env.SMTP_PORT),
-        secure: false, // true for 465, false for other ports
-        auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS
-        }
-      });
+    doc.fontSize(12).text(`
+Client Name: ${name}
+Client Email: ${email}
 
-      await transporter.sendMail({
-        from: process.env.EMAIL_FROM,
-        to: process.env.EMAIL_TO,
-        subject: `Agreement for ${name}`,
-        text: `Please find attached the agreement for ${name}.`,
-        attachments: [
-          {
-            filename: `${name}-agreement.pdf`,
-            path: pdfPath
-          }
-        ]
-      });
+Services:
+Provider agrees to assist Client in identifying and recovering surplus funds.
 
-      res.json({ message: "PDF generated and emailed successfully" });
+Fee:
+Client agrees to pay a contingency fee equal to 30% of recovered funds.
+
+Payment Authorization:
+Client authorizes direct payment from the county or issuing authority.
+
+Electronic Signature:
+The signature below constitutes a legally binding agreement.
+    `);
+
+    doc.moveDown();
+
+    // Signature Image
+    const base64Data = signatureData.replace(/^data:image\/png;base64,/, "");
+    const signatureBuffer = Buffer.from(base64Data, "base64");
+
+    doc.text("Signature:");
+    doc.image(signatureBuffer, {
+      width: 200
     });
 
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Failed to generate PDF or send email" });
+    doc.moveDown();
+    doc.text(`Signed on: ${new Date().toLocaleString()}`);
+
+    doc.end();
+
+    await new Promise(resolve => writeStream.on("finish", resolve));
+
+    /* ===== EMAIL PDF ===== */
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: Number(process.env.SMTP_PORT),
+      secure: true,
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS
+      }
+    });
+
+    await transporter.sendMail({
+      from: process.env.EMAIL_FROM,
+      to: process.env.EMAIL_TO || email,
+      subject: "Signed Service Agreement",
+      text: "Attached is the signed service agreement.",
+      attachments: [
+        {
+          filename: "Signed-Agreement.pdf",
+          path: pdfPath
+        }
+      ]
+    });
+
+    res.send(`
+      <h2>Agreement Signed Successfully</h2>
+      <p>A copy has been emailed.</p>
+    `);
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Error processing agreement");
   }
 });
 
-// Start server
-app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
+app.listen(PORT, () => {
+  console.log("Secure Agreement Service Running on port", PORT);
 });
