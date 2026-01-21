@@ -1,75 +1,84 @@
-// server.js
-const express = require('express');
-const bodyParser = require('body-parser');
-const PDFDocument = require('pdfkit');
-const nodemailer = require('nodemailer');
-const fs = require('fs');
-require('dotenv').config();
+import express from "express";
+import path from "path";
+import { fileURLToPath } from "url";
+import bodyParser from "body-parser";
+import PDFDocument from "pdfkit";
+import nodemailer from "nodemailer";
+import fs from "fs";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(bodyParser.json());
-app.use(express.static('public'));
+app.use(express.static(path.join(__dirname, "public")));
+app.use(bodyParser.json({ limit: "10mb" }));
 
-// Create agreement route
-app.post('/create-agreement', async (req, res) => {
+// Serve index.html
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
+
+// Endpoint to receive form data and signature
+app.post("/submit", async (req, res) => {
   try {
-    const { name, email, signature, feeAmount } = req.body;
+    const { name, email, signatureDataUrl } = req.body;
 
-    const doc = new PDFDocument({ size: 'LETTER', margin: 50 });
-    const chunks = [];
-    doc.on('data', chunk => chunks.push(chunk));
+    // Create PDF
+    const pdfPath = path.join(__dirname, `agreement-${Date.now()}.pdf`);
+    const doc = new PDFDocument();
+    const writeStream = fs.createWriteStream(pdfPath);
+    doc.pipe(writeStream);
 
-    doc.fontSize(18).text('Surplus Funds Recovery Agreement', { align: 'center' });
+    doc.fontSize(20).text("Surplus Funds Recovery Service Agreement", { align: "center" });
     doc.moveDown();
     doc.fontSize(12).text(`Client Name: ${name}`);
-    doc.text(`Email: ${email}`);
-    doc.text(`Fee Amount: $${feeAmount}`);
+    doc.text(`Client Email: ${email}`);
+    doc.text(`Date: ${new Date().toLocaleDateString()}`);
     doc.moveDown();
-    doc.text(
-      'This agreement confirms your engagement with our service. ' +
-      'You retain full ownership of any recovered funds. ' +
-      'Payment is contingent on successful recovery and will be paid directly.'
-    );
+
+    doc.text("Full agreement terms go here...", { align: "justify" });
     doc.moveDown();
-    doc.text('Electronic Signature:');
-    if (signature) {
-      const sigBuffer = Buffer.from(signature.replace(/^data:image\/png;base64,/, ''), 'base64');
-      doc.image(sigBuffer, { width: 200 });
+
+    // Add signature if available
+    if (signatureDataUrl) {
+      const base64Data = signatureDataUrl.replace(/^data:image\/png;base64,/, "");
+      const imgPath = path.join(__dirname, `sig-${Date.now()}.png`);
+      fs.writeFileSync(imgPath, base64Data, "base64");
+      doc.image(imgPath, { width: 200 });
     }
+
     doc.end();
 
-    const pdfBuffer = await new Promise(resolve => {
-      doc.on('end', () => resolve(Buffer.concat(chunks)));
+    writeStream.on("finish", async () => {
+      // Send email with PDF attached
+      const transporter = nodemailer.createTransport({
+        host: "smtp.example.com", // replace with your SMTP
+        port: 587,
+        secure: false,
+        auth: {
+          user: "your-email@example.com",
+          pass: "your-password",
+        },
+      });
+
+      await transporter.sendMail({
+        from: '"Surplus Funds Service" <your-email@example.com>',
+        to: email,
+        subject: "Your Service Agreement",
+        text: "Please find attached your service agreement.",
+        attachments: [{ filename: "agreement.pdf", path: pdfPath }],
+      });
+
+      res.json({ success: true, message: "PDF generated and emailed successfully." });
     });
-
-    // Send email
-    const transporter = nodemailer.createTransport({
-      host: process.env.EMAIL_HOST,
-      port: process.env.EMAIL_PORT,
-      secure: false,
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-      }
-    });
-
-    await transporter.sendMail({
-      from: `"Your Company" <${process.env.EMAIL_USER}>`,
-      to: email,
-      subject: 'Signed Surplus Funds Agreement',
-      text: 'Attached is your signed agreement.',
-      attachments: [{ filename: 'Agreement.pdf', content: pdfBuffer }]
-    });
-
-    res.status(200).json({ success: true });
-
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-
+app.listen(PORT, () => {
+  console.log(`Server running at http://localhost:${PORT}`);
+});
